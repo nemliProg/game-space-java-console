@@ -93,7 +93,6 @@ public class Gamer {
                 @Override
                 public void run(){
                     int test = 0;
-                    System.out.println("\n\nKant hna\n\n");
                     for (Gamer g : wl) {
                         if (g.getPostN() == postN) {
                             Gamer.session s = g.new session(wl,p);

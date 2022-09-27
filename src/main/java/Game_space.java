@@ -1,41 +1,106 @@
+import com.github.cliftonlabs.json_simple.JsonArray;
+import com.github.cliftonlabs.json_simple.JsonException;
 import com.github.cliftonlabs.json_simple.JsonObject;
+import com.github.cliftonlabs.json_simple.Jsoner;
+import java.io.IOException;
 import static java.lang.System.exit;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Scanner;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
 public class Game_space {
 
+    private static ArrayList<MonthRevenue> mrl = new ArrayList<>();
     
-    private double monthRevenue;
-
-    public Game_space(double monthRevenue) {
-        this.monthRevenue = monthRevenue;
+    
+    private static Path getDefaultPath(){
+        String home = System.getProperty("user.home");
+        return Paths.get(home).resolve("MonthRevenue.json");
     }
-
-    public double getMonthRevenue() {
-        return monthRevenue;
+    
+    static void save(){
+        save(getDefaultPath());
     }
-
-    public void setMonthRevenue(double monthRevenue) {
-        this.monthRevenue = monthRevenue;
+    
+    static void save(Path path){
+        JsonArray ja = new JsonArray();
+        for(MonthRevenue mr: mrl){
+            ja.add(mr.toJsonObject());
+        }
+        String jsonText = Jsoner.serialize(ja);
+        try {
+            Files.write(path,jsonText.getBytes(),StandardOpenOption.CREATE);
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+    
+    static void load(){
+        load(getDefaultPath());
+    }
+    
+    static void load(Path path){
+        String jsonText = null;
+        JsonArray ja = null;
+        try {
+            jsonText = new String(Files.readAllBytes(path));
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+        
+        try {
+            ja = (JsonArray) Jsoner.deserialize(jsonText);
+        } catch (JsonException ex) {
+            throw new RuntimeException(ex);
+        }
+        
+        for (Object o : ja) {
+            JsonObject jo = (JsonObject) o;
+            MonthRevenue mr = MonthRevenue.fromJsonObject(jo);
+            Game_space.mrl.add(mr);
+        }
     }
     
     
     public static void main(String[] args) {
         
         String thisMounth = LocalDate.now().format(DateTimeFormatter.ofPattern("LLLL"));
-        String thisDay = LocalDate.now().format(DateTimeFormatter.ofPattern("dd"));
         
+        
+        Game_space.load();
+        System.out.println(thisMounth);
+        if (!Game_space.mrl.get(Game_space.mrl.size()-1).getName().equals(thisMounth)) {
+            Game_space.mrl.add(new MonthRevenue(thisMounth,0));
+        }
+        
+//        Total revenue de mois
+
+//          Game_space.load();
+//          Game_space.save();
+//          for(MonthRevenue monR : Game_space.mrl){
+//              System.out.println(monR.getName() +" : " + monR.getRevenue());
+//          }
+          
+        
+       
         
         
 //        Total revenue de la journee
         double td = 0;
         
-        JsonObject jo = new JsonObject();
+//        JsonObject jo = new JsonObject();
+        
+        
+        
+        
         
 //        Clients or Gamers
         ArrayList<Gamer> clients = new ArrayList<>();
@@ -92,7 +157,6 @@ public class Game_space {
                     case 1 -> {
                         String lname,fname;
                         int duration,postNum,game;
-                        
 //                        Game
                         gamesMenu(games);
                         game = (scanner.nextInt()-1);
@@ -114,6 +178,8 @@ public class Game_space {
                         postNum = (scanner.nextInt()-1);
                         
                         Gamer g = new Gamer(lname,fname,postNum,durations.get(schedulesAvailable.get(duration)),games.get(game),getPrice(schedulesAvailable.get(duration)));
+                        Game_space.mrl.get(Game_space.mrl.size()-1).setRevenue(Game_space.mrl.get(Game_space.mrl.size()-1).getRevenue()+getPrice(schedulesAvailable.get(duration)));
+                        Game_space.save();
                         if(posts.get(postNum).getAvailable() == true){
                             Post.bookPost(postNum,posts);
                             td += 133.2;
@@ -121,8 +187,15 @@ public class Game_space {
                             Gamer.session s = g.new session(waitingList,posts);
                             
                         }else{
-                            clients.add(g);
-                            waitingList.add(g);
+                            if(waitingList.size() >= 8){
+                               System.out.println("        Sorry the waiting List is Full.");
+                               System.out.println("        see you Soon.");
+                               g = null;
+                            }else{
+                               clients.add(g);
+                               waitingList.add(g);
+                            }
+
                         }
                     }
                     case 2 ->{ 
@@ -182,11 +255,52 @@ public class Game_space {
     }
     
     public static void durationsMenu(ArrayList<String> sa){
+        LocalTime now = LocalTime.now();
+        LocalTime midi = LocalTime.parse("12:00");
+        LocalTime L3chiya = LocalTime.parse("20:00");
+        
+        System.out.println(now.toString() +" - "+ midi.toString() + " = "+ Duration.between(now, midi).toMinutesPart());
+        
+        
         System.out.println("choose Duration");
-        System.out.println("    Durations Available :");
-        for (int i = 1; i < sa.size()+1; i++) {
-            System.out.println( i + "- "+sa.get(i-1));
+        System.out.println("    Duration(s) Available :");
+        
+        int dur = Duration.between(now, midi).toMinutesPart();
+        
+        double hours = dur/60;
+        if(now.isAfter(midi) && now.isBefore(LocalTime.parse("14:00"))){
+            System.out.println("Sad");
+        }else if(dur > 0){
+            
+            if(dur < 30){
+                System.out.println("Ansado db");
+            }else if(dur > 30 && hours < 1){
+                System.out.println( 1 + "- "+sa.get(0));
+            }else if(dur > 60 && hours < 2){
+                for (int i = 1; i < sa.size()-2; i++) {
+                    System.out.println( i + "- "+sa.get(i-1));
+                }
+            }else if(dur > 120 && hours < 3){
+                for (int i = 1; i < sa.size()-1; i++) {
+                    System.out.println( i + "- "+sa.get(i-1));
+                }
+            }else if(dur > 300){
+                for (int i = 1; i < sa.size(); i++) {
+                    System.out.println( i + "- "+sa.get(i-1));
+                }
+            }
+            
+        }else{
+            dur = Duration.between(now, L3chiya).toMinutesPart();
+            
         }
+        
+        
+        
+        
+//        for (int i = 1; i < sa.size()+1; i++) {
+//            System.out.println( i + "- "+sa.get(i-1));
+//        }
         System.out.print("\nChoose duration : ");
     }
     
@@ -201,17 +315,4 @@ public class Game_space {
         }
         System.out.print("\n\n");
     }
-    
-    public JsonObject toJsonObject(Path path){
-        JsonObject jo = new JsonObject();
-        jo.put("total revenue for the month.", 3333);
-        return jo;
-    }
-    
-    void save(Path path){
-        
-    }
-    
-    
-
 }
